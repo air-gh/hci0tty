@@ -1,6 +1,7 @@
 # hci0tty
 Tunnel between Linux Bluetooth HCI socket and pseudo tty
 using Bluetooth stack only for tty interface with USB HCI dongle
+based on tty0tty-1.2/pts
 
 # Usage
 
