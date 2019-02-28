@@ -116,9 +116,11 @@ conf_hci(int fd, int ifidx)
   }
 
   if (ioctl(fd, _IOW('H', 220, int), 1 << 8) != 0) { /* 220 = HCISETRAW */
-    perror("ioctl");
 #if 0 /* recent kernel does not permit HCISETRAW checked by strace hcidump */
+    perror("ioctl(HCISETRAW)");
     return EXIT_FAILURE;
+#else
+    perror("warning: ioctl(HCISETRAW)");
 #endif
   }
 
