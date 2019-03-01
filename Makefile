@@ -4,7 +4,7 @@ CC=gcc
 FLAGS= -Wall -O2 -D_GNU_SOURCE
 
 all:
-	$(CC) $(FLAGS) tty0tty.c -o tty0tty
+	$(CC) $(FLAGS) hci0tty.c -o hci0tty
 
 clean:
-	rm -rf tty0tty *.o core
+	rm -rf hci0tty *.o core
