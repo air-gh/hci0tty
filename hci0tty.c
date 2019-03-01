@@ -21,6 +21,7 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
    For e-mail suggestions :  lcgamboa@yahoo.com
+   HCI patch: Air <air.gml@gmail.com>
    ######################################################################## */
 
 
@@ -33,6 +34,22 @@
 #include <errno.h>
 
 #include <termio.h>
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+
+struct sockaddr_hci {
+   sa_family_t    hci_family;
+   unsigned short hci_dev;
+   unsigned short hci_channel;
+};
+
+struct hci_filter {
+  unsigned int type_mask;
+  unsigned int event_mask[2];
+  unsigned short opcode;
+};
 
 static char buffer[1024];
 
@@ -70,6 +87,43 @@ ptym_open(char *pts_name, char *pts_name_s , int pts_namesz)
     return(fdm);        
 }
 
+
+int
+conf_hci(int fd, int ifidx)
+{
+  int opt = 1;
+  struct hci_filter hcifilter = { 0xffffffff, { 0xffffffff, 0xffffffff}, 0x0000 }; /* all type, all event */
+  struct sockaddr_hci sahci = { 0 };
+  socklen_t salen;
+
+  if (setsockopt(fd, 0, 1, &opt, sizeof(opt)) != 0) { /* 0 = SOL_HCI, 1 = HCI_DATA_DIR */
+    perror("setsockopt(HCI_DATA_DIR)");
+    return EXIT_FAILURE;
+  }
+  if (setsockopt(fd, 0, 2, &hcifilter, sizeof(hcifilter)) != 0) { /* 0 = SOL_HCI, 2 = HCI_FILTER */
+    perror("setsockopt(HCI_FILTER)");
+    return EXIT_FAILURE;
+  }
+
+  sahci.hci_family = PF_BLUETOOTH;
+  sahci.hci_dev = ifidx;
+  sahci.hci_channel = 0;
+  salen = sizeof(sahci);
+
+  if (bind(fd, (struct sockaddr *)&sahci, salen) < 0) {
+    perror("bind");
+    return EXIT_FAILURE;
+  }
+
+  if (ioctl(fd, _IOW('H', 220, int), 1 << 8) != 0) { /* 220 = HCISETRAW */
+    perror("ioctl");
+#if 0 /* recent kernel does not permit HCISETRAW checked by strace hcidump */
+    return EXIT_FAILURE;
+#endif
+  }
+
+  return EXIT_SUCCESS;
+}
 
 int
 conf_ser(int serialDev)
@@ -156,10 +210,8 @@ copydata(int fdfrom, int fdto)
 
 int main(int argc, char* argv[])
 {
-  char master1[1024];
-  char slave1[1024];
-  char master2[1024];
-  char slave2[1024];
+  char master[1024];
+  char slave[1024];
 
   int fd1;
   int fd2;
@@ -167,30 +219,40 @@ int main(int argc, char* argv[])
   fd_set rfds;
   int retval;
 
-  fd1=ptym_open(master1,slave1,1024);
+  int ifidx = 0;
 
-  fd2=ptym_open(master2,slave2,1024);
+  fd1=socket(PF_BLUETOOTH,SOCK_RAW,1); /* 1 = BTPROTO_HCI */
+  if (fd1 < 0) {
+    perror("socket");
+    return 1;
+  }
+
+  fd2=ptym_open(master,slave,1024);
+  if (fd2 < 0) {
+    perror("ptym_open");
+    return 1;
+  }
 
   if (argc >= 3)
   {
-    unlink(argv[1]);
     unlink(argv[2]);
-    if (symlink(slave1, argv[1]) < 0)
-	{
-      fprintf(stderr, "Cannot create: %s\n", argv[1]);
-      return 1;
-    }
-    if (symlink(slave2, argv[2]) < 0) {
+    if (symlink(slave, argv[2]) < 0) {
       fprintf(stderr, "Cannot create: %s\n", argv[2]);
       return 1;
     }
     printf("(%s) <=> (%s)\n",argv[1],argv[2]);
+    ifidx = argv[1][3] - '0';
+  }
+  else if (argc == 2) {
+    printf("(%s) <=> (%s)\n",argv[1],slave);
+    ifidx = argv[1][3] - '0';
   }
   else {
-    printf("(%s) <=> (%s)\n",slave1,slave2);
+    printf("(%s) <=> (%s)\n","hci0",slave);
   }
 
-  conf_ser(fd1);
+  if (conf_hci(fd1, ifidx) == EXIT_FAILURE)
+    return 1;
   conf_ser(fd2);
 
   while(1)
