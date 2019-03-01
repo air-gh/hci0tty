@@ -21,7 +21,7 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
    For e-mail suggestions :  lcgamboa@yahoo.com
-   HCI patch: Air <air.gml@gmail.com>
+   Bluetooth HCI patch: Air <air.gml@gmail.com>
    ######################################################################## */
 
 
@@ -36,13 +36,12 @@
 #include <termio.h>
 
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <sys/ioctl.h>
 
 struct sockaddr_hci {
-   sa_family_t    hci_family;
-   unsigned short hci_dev;
-   unsigned short hci_channel;
+  sa_family_t    hci_family;
+  unsigned short hci_dev;
+  unsigned short hci_channel;
 };
 
 struct hci_filter {
@@ -136,13 +135,19 @@ struct termios params;
 
 // Get terminal atributes
 rc = tcgetattr(serialDev, &params);
+if (rc < 0)
+  goto fail;
 
 // Modify terminal attributes
 cfmakeraw(&params);
 
 rc = cfsetispeed(&params, B9600);
+if (rc < 0)
+  goto fail;
 
 rc = cfsetospeed(&params, B9600);
+if (rc < 0)
+  goto fail;
 
 // CREAD - Enable port to read data
 // CLOCAL - Ignore modem control lines
@@ -153,6 +158,8 @@ params.c_cflag |= (B9600 |CS8 | CLOCAL | CREAD);
 
 // Set serial attributes
 rc = tcsetattr(serialDev, TCSANOW, &params);
+if (rc < 0)
+  goto fail;
 
 // Flush serial device of both non-transmitted
 // output data and non-read input data....
@@ -160,6 +167,10 @@ tcflush(serialDev, TCIOFLUSH);
 
 
   return EXIT_SUCCESS;
+
+ fail:
+  perror("termios");
+  return EXIT_FAILURE;
 }
 
 void
@@ -197,7 +208,7 @@ copydata(int fdfrom, int fdto)
     if (bw <= 0)
     {
       // kernel buffer may be full, but we can recover
-      fprintf(stderr, "Write error, br=%d bw=%d\n", br, bw);
+      fprintf(stderr, "Write error, br=%ld bw=%ld\n", br, bw);
       usleep(500000);
       // discard input
       while (read(fdfrom, buffer, 1024) > 0)
@@ -255,7 +266,8 @@ int main(int argc, char* argv[])
 
   if (conf_hci(fd1, ifidx) == EXIT_FAILURE)
     return 1;
-  conf_ser(fd2);
+  if (conf_ser(fd2) == EXIT_FAILURE)
+    return 1;
 
   while(1)
   {
