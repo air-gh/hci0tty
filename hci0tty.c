@@ -95,10 +95,6 @@ conf_hci(int fd, int ifidx)
   struct sockaddr_hci sahci = { 0 };
   socklen_t salen;
 
-  if (setsockopt(fd, 0, 1, &opt, sizeof(opt)) != 0) { /* 0 = SOL_HCI, 1 = HCI_DATA_DIR */
-    perror("setsockopt(HCI_DATA_DIR)");
-    return EXIT_FAILURE;
-  }
   if (setsockopt(fd, 0, 2, &hcifilter, sizeof(hcifilter)) != 0) { /* 0 = SOL_HCI, 2 = HCI_FILTER */
     perror("setsockopt(HCI_FILTER)");
     return EXIT_FAILURE;
